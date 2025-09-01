@@ -123,8 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
             title: "New Beginnings",
             description: "LUMA's Founder and current President, Rabin Bhandari, initially started this organization going under the title Young Immigrants of America, along with Board Members Saad Bentahar, Camila Chi, Anushka Dutta, Prisha Guruwacharya, and Arvin Singh. They had dreams of providing mentorship to enable young immigrants to thrive academically, personally, and socially; taking matters into their own hands by starting YIOA.",
             images: [
-                "./Exampleimages/YIOA LOGO DESIGN-svg.png",
-                "./Exampleimages/YIOA LOGO DESIGN.svg"
+                "./Exampleimages/UpdatedYIOA-HERO.png",
+                "./Exampleimages/UpdatedYIOAPaper.png"
             ]
         },
         2: {
@@ -147,8 +147,8 @@ document.addEventListener('DOMContentLoaded', function() {
             title: "UNICEF Collab",
             description: "YIOA's first interactive meeting came November 14th, collaborating with Eastern Technical High School's UNICEF United to put together goodie bags for the bright students in the ESOL program at Gunpowder Elementary to reinforce the importance of education and curiosity.",
             images: [
-                "./Exampleimages/diversity.png",
-                "./Exampleimages/comments.png"
+                "./RoughDraftImages/unicef1.png",
+                "./RoughDraftImages/unicef2.png"
             ]
         },
         5: {
@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
             description: "In December of 2024, YIOA had the chance to speak at the BCPS Budget Meeting and made sure to emphasize the needs of ESOL students and their experiences with the impact of language barriers on education. Through more personal examples, YIOA was the spokesperson for immigrant and international students struggling in the classroom.",
             images: [
                 "./RoughDraftImages/bcps1.png",
-                "./Exampleimages/data-science.png"
+                "./RoughDraftImages/bcps2.png"
             ]
         },
         6: {
@@ -168,11 +168,11 @@ document.addEventListener('DOMContentLoaded', function() {
             ]
         },
         7: {
-            title: "Vila Cresta CuCo",
+            title: "Villa Cresta CuCo",
             description: "On April 8th of 2025, YIOA attended Villa Cresta Elementary School's Cultural Coalescence event, supporting their PTA in encouraging their young students to explore, embrace, and enjoy cultures different than their own.",
             images: [
                 "./RoughDraftImages/villa1.png",
-                "./Exampleimages/diversity.png"
+                "./RoughDraftImages/villa2.png"
             ]
         },
         8: {
@@ -217,10 +217,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Event listeners for entire event content cards
-    const eventContents = document.querySelectorAll('.event-content');
-    eventContents.forEach((content, index) => {
-        content.addEventListener('click', function() {
+    // Event listeners for entire timeline cards
+    const timelineCards = document.querySelectorAll('.timeline-card');
+    timelineCards.forEach((card, index) => {
+        card.addEventListener('click', function() {
             const eventId = index + 1; // Event IDs are 1-based
             openModal(eventId);
         });
@@ -242,5 +242,126 @@ document.addEventListener('DOMContentLoaded', function() {
             closeModal();
         }
     });
+});
+
+// Horizontal Timeline Scroll Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const timelineTrack = document.getElementById('timeline-track');
+    const prevBtn = document.getElementById('timeline-prev');
+    const nextBtn = document.getElementById('timeline-next');
+    const timelineLine = document.querySelector('.timeline-line');
+    
+    if (!timelineTrack || !prevBtn || !nextBtn || !timelineLine) return;
+    
+    let currentPosition = 0;
+    const scrollAmount = 340; // Width of timeline item (300px) + margin (20px each side)
+    const totalItems = document.querySelectorAll('.timeline-item').length;
+    
+    // Calculate max position based on actual container width rather than arbitrary visible items
+    const container = timelineTrack.parentElement;
+    const containerWidth = container.clientWidth;
+    const totalTrackWidth = totalItems * scrollAmount + 100; // Include track padding (50px each side)
+    const availableViewWidth = containerWidth - 100; // Account for timeline line positioning (50px each side)
+    const maxPosition = Math.max(0, totalTrackWidth - availableViewWidth);
+    
+    // Update button states
+    function updateButtonStates() {
+        prevBtn.disabled = currentPosition <= 0;
+        nextBtn.disabled = currentPosition >= maxPosition;
+        
+        // Update timeline line progress
+        const progress = maxPosition > 0 ? (currentPosition / maxPosition) * 100 : 0;
+        const progressWidth = Math.min(100, Math.max(12.5, progress));
+        timelineLine.style.setProperty('--progress-width', `${progressWidth}%`);
+    }
+    
+    // Smooth scroll function
+    function scrollTimeline(position) {
+        timelineTrack.style.transform = `translateX(-${position}px)`;
+        currentPosition = position;
+        updateButtonStates();
+    }
+    
+    // Previous button click
+    prevBtn.addEventListener('click', function() {
+        const newPosition = Math.max(0, currentPosition - scrollAmount);
+        scrollTimeline(newPosition);
+    });
+    
+    // Next button click
+    nextBtn.addEventListener('click', function() {
+        const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+        scrollTimeline(newPosition);
+    });
+    
+    // Touch/swipe support for mobile
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+    
+    timelineTrack.addEventListener('touchstart', function(e) {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+    });
+    
+    timelineTrack.addEventListener('touchmove', function(e) {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX;
+        const diffX = startX - currentX;
+        
+        // Prevent default scrolling
+        if (Math.abs(diffX) > 10) {
+            e.preventDefault();
+        }
+    });
+    
+    timelineTrack.addEventListener('touchend', function(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        
+        const diffX = startX - currentX;
+        
+        if (Math.abs(diffX) > 50) { // Minimum swipe distance
+            if (diffX > 0 && currentPosition < maxPosition) {
+                // Swipe left - go to next
+                const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+                scrollTimeline(newPosition);
+            } else if (diffX < 0 && currentPosition > 0) {
+                // Swipe right - go to previous
+                const newPosition = Math.max(0, currentPosition - scrollAmount);
+                scrollTimeline(newPosition);
+            }
+        }
+    });
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft' && !prevBtn.disabled) {
+            const newPosition = Math.max(0, currentPosition - scrollAmount);
+            scrollTimeline(newPosition);
+        } else if (e.key === 'ArrowRight' && !nextBtn.disabled) {
+            const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+            scrollTimeline(newPosition);
+        }
+    });
+    
+
+    
+    // Handle window resize
+    window.addEventListener('resize', function() {
+        // Recalculate positions based on new container width
+        const newContainerWidth = container.clientWidth;
+        const newAvailableViewWidth = newContainerWidth - 100;
+        const newMaxPosition = Math.max(0, totalTrackWidth - newAvailableViewWidth);
+        
+        if (currentPosition > newMaxPosition) {
+            scrollTimeline(newMaxPosition);
+        } else {
+            updateButtonStates();
+        }
+    });
+    
+    // Initial setup
+    updateButtonStates();
 });
   
