@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Horizontal Timeline Scroll Functionality
+// Horizontal Timeline Scroll Functionality (Updated for Vertical on Mobile)
 document.addEventListener('DOMContentLoaded', function() {
     const timelineTrack = document.getElementById('timeline-track');
     const prevBtn = document.getElementById('timeline-prev');
@@ -254,63 +254,160 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!timelineTrack || !prevBtn || !nextBtn || !timelineLine) return;
     
     let currentPosition = 0;
-    const scrollAmount = 340; // Width of timeline item (300px) + margin (20px each side)
-    const totalItems = document.querySelectorAll('.timeline-item').length;
     
-    // Calculate max position based on actual container width rather than arbitrary visible items
-    const container = timelineTrack.parentElement;
-    const containerWidth = container.clientWidth;
-    const totalTrackWidth = totalItems * scrollAmount + 100; // Include track padding (50px each side)
-    const availableViewWidth = containerWidth - 100; // Account for timeline line positioning (50px each side)
-    const maxPosition = Math.max(0, totalTrackWidth - availableViewWidth);
+    // Function to check if we're using vertical timeline
+    function isVerticalTimeline() {
+        return window.innerWidth <= 1024;
+    }
     
-    // Update button states
+    // Function to get timeline configuration based on screen size
+    function getTimelineConfig() {
+        const isVertical = isVerticalTimeline();
+        const screenWidth = window.innerWidth;
+        
+        if (isVertical) {
+            // Vertical timeline configuration
+            let itemHeight, itemGap;
+            if (screenWidth <= 480) {
+                itemHeight = 120;
+                itemGap = 40;
+            } else if (screenWidth <= 768) {
+                itemGap = 40;
+                itemHeight = 130;
+            } else {
+                itemHeight = 150;
+                itemGap = 40;
+            }
+            
+            return {
+                isVertical: true,
+                scrollAmount: itemHeight + itemGap,
+                property: 'translateY',
+                progressProperty: '--progress-height'
+            };
+        } else {
+            // Horizontal timeline configuration
+            return {
+                isVertical: false,
+                scrollAmount: 340, // 300px item + 40px margin
+                property: 'translateX',
+                progressProperty: '--progress-width'
+            };
+        }
+    }
+    
+    // Function to calculate timeline dimensions
+    function getTimelineDimensions() {
+        const config = getTimelineConfig();
+        const container = timelineTrack.parentElement;
+        const totalItems = document.querySelectorAll('.timeline-item').length;
+        
+        let containerSize, totalTrackSize, trackPadding, maxPosition;
+        
+        if (config.isVertical) {
+            // Vertical timeline calculations
+            containerSize = container.clientHeight;
+            trackPadding = 80; // 40px padding top and bottom
+            totalTrackSize = (totalItems * config.scrollAmount) + trackPadding;
+            maxPosition = Math.max(0, totalTrackSize - containerSize);
+        } else {
+            // Horizontal timeline calculations
+            containerSize = container.clientWidth;
+            trackPadding = 100; // 50px padding each side
+            totalTrackSize = (totalItems * config.scrollAmount) + trackPadding;
+            const availableViewWidth = containerSize - trackPadding;
+            maxPosition = Math.max(0, totalTrackSize - availableViewWidth);
+        }
+        
+        return {
+            scrollAmount: config.scrollAmount,
+            maxPosition,
+            totalItems,
+            containerSize,
+            totalTrackSize,
+            config
+        };
+    }
+    
+    // Update button states and progress
     function updateButtonStates() {
+        const { maxPosition, config } = getTimelineDimensions();
+        
         prevBtn.disabled = currentPosition <= 0;
         nextBtn.disabled = currentPosition >= maxPosition;
         
         // Update timeline line progress
         const progress = maxPosition > 0 ? (currentPosition / maxPosition) * 100 : 0;
-        const progressWidth = Math.min(100, Math.max(12.5, progress));
-        timelineLine.style.setProperty('--progress-width', `${progressWidth}%`);
+        const progressValue = Math.min(100, Math.max(12.5, progress));
+        timelineLine.style.setProperty(config.progressProperty, `${progressValue}%`);
+        
+        // Update button icons based on orientation
+        if (config.isVertical) {
+            prevBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+            nextBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+        } else {
+            prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        }
     }
     
     // Smooth scroll function
     function scrollTimeline(position) {
-        timelineTrack.style.transform = `translateX(-${position}px)`;
-        currentPosition = position;
+        const { maxPosition, config } = getTimelineDimensions();
+        
+        // Ensure position is within bounds
+        currentPosition = Math.max(0, Math.min(maxPosition, position));
+        
+        // Apply transform based on orientation
+        if (config.isVertical) {
+            timelineTrack.style.transform = `translateY(-${currentPosition}px)`;
+        } else {
+            timelineTrack.style.transform = `translateX(-${currentPosition}px)`;
+        }
+        
         updateButtonStates();
     }
     
-    // Previous button click
+    // Previous button click (up arrow for vertical, left arrow for horizontal)
     prevBtn.addEventListener('click', function() {
+        const { scrollAmount } = getTimelineDimensions();
         const newPosition = Math.max(0, currentPosition - scrollAmount);
         scrollTimeline(newPosition);
     });
     
-    // Next button click
+    // Next button click (down arrow for vertical, right arrow for horizontal)
     nextBtn.addEventListener('click', function() {
+        const { scrollAmount, maxPosition } = getTimelineDimensions();
         const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
         scrollTimeline(newPosition);
     });
     
-    // Touch/swipe support for mobile
+    // Touch/swipe support for both orientations
     let startX = 0;
+    let startY = 0;
     let currentX = 0;
+    let currentY = 0;
     let isDragging = false;
     
     timelineTrack.addEventListener('touchstart', function(e) {
         startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
         isDragging = true;
     });
     
     timelineTrack.addEventListener('touchmove', function(e) {
         if (!isDragging) return;
         currentX = e.touches[0].clientX;
-        const diffX = startX - currentX;
+        currentY = e.touches[0].clientY;
         
-        // Prevent default scrolling
-        if (Math.abs(diffX) > 10) {
+        const config = getTimelineConfig();
+        const diffX = startX - currentX;
+        const diffY = startY - currentY;
+        
+        // Determine if we should prevent default based on orientation and swipe direction
+        if (config.isVertical && Math.abs(diffY) > 10) {
+            e.preventDefault();
+        } else if (!config.isVertical && Math.abs(diffX) > 10) {
             e.preventDefault();
         }
     });
@@ -319,49 +416,91 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isDragging) return;
         isDragging = false;
         
-        const diffX = startX - currentX;
+        const { scrollAmount, maxPosition, config } = getTimelineDimensions();
         
-        if (Math.abs(diffX) > 50) { // Minimum swipe distance
-            if (diffX > 0 && currentPosition < maxPosition) {
-                // Swipe left - go to next
-                const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
-                scrollTimeline(newPosition);
-            } else if (diffX < 0 && currentPosition > 0) {
-                // Swipe right - go to previous
-                const newPosition = Math.max(0, currentPosition - scrollAmount);
-                scrollTimeline(newPosition);
+        if (config.isVertical) {
+            const diffY = startY - currentY;
+            if (Math.abs(diffY) > 50) { // Minimum swipe distance
+                if (diffY > 0 && currentPosition < maxPosition) {
+                    // Swipe up - go to next (down)
+                    const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+                    scrollTimeline(newPosition);
+                } else if (diffY < 0 && currentPosition > 0) {
+                    // Swipe down - go to previous (up)
+                    const newPosition = Math.max(0, currentPosition - scrollAmount);
+                    scrollTimeline(newPosition);
+                }
+            }
+        } else {
+            const diffX = startX - currentX;
+            if (Math.abs(diffX) > 50) { // Minimum swipe distance
+                if (diffX > 0 && currentPosition < maxPosition) {
+                    // Swipe left - go to next
+                    const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+                    scrollTimeline(newPosition);
+                } else if (diffX < 0 && currentPosition > 0) {
+                    // Swipe right - go to previous
+                    const newPosition = Math.max(0, currentPosition - scrollAmount);
+                    scrollTimeline(newPosition);
+                }
             }
         }
     });
     
     // Keyboard navigation
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'ArrowLeft' && !prevBtn.disabled) {
-            const newPosition = Math.max(0, currentPosition - scrollAmount);
-            scrollTimeline(newPosition);
-        } else if (e.key === 'ArrowRight' && !nextBtn.disabled) {
-            const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
-            scrollTimeline(newPosition);
+        const { scrollAmount, maxPosition, config } = getTimelineDimensions();
+        
+        if (config.isVertical) {
+            // Vertical timeline: up/down arrows
+            if (e.key === 'ArrowUp' && !prevBtn.disabled) {
+                e.preventDefault();
+                const newPosition = Math.max(0, currentPosition - scrollAmount);
+                scrollTimeline(newPosition);
+            } else if (e.key === 'ArrowDown' && !nextBtn.disabled) {
+                e.preventDefault();
+                const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+                scrollTimeline(newPosition);
+            }
+        } else {
+            // Horizontal timeline: left/right arrows
+            if (e.key === 'ArrowLeft' && !prevBtn.disabled) {
+                const newPosition = Math.max(0, currentPosition - scrollAmount);
+                scrollTimeline(newPosition);
+            } else if (e.key === 'ArrowRight' && !nextBtn.disabled) {
+                const newPosition = Math.min(maxPosition, currentPosition + scrollAmount);
+                scrollTimeline(newPosition);
+            }
         }
     });
     
-
-    
     // Handle window resize
+    let resizeTimeout;
     window.addEventListener('resize', function() {
-        // Recalculate positions based on new container width
-        const newContainerWidth = container.clientWidth;
-        const newAvailableViewWidth = newContainerWidth - 100;
-        const newMaxPosition = Math.max(0, totalTrackWidth - newAvailableViewWidth);
-        
-        if (currentPosition > newMaxPosition) {
-            scrollTimeline(newMaxPosition);
-        } else {
-            updateButtonStates();
-        }
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            // Reset position on orientation change
+            const wasVertical = timelineTrack.style.transform.includes('translateY');
+            const isNowVertical = isVerticalTimeline();
+            
+            if (wasVertical !== isNowVertical) {
+                // Orientation changed, reset position
+                currentPosition = 0;
+                scrollTimeline(0);
+            } else {
+                // Same orientation, just recalculate bounds
+                const { maxPosition } = getTimelineDimensions();
+                if (currentPosition > maxPosition) {
+                    scrollTimeline(maxPosition);
+                } else {
+                    updateButtonStates();
+                }
+            }
+        }, 100);
     });
     
     // Initial setup
     updateButtonStates();
+    scrollTimeline(0); // Initialize with proper transform
 });
   
